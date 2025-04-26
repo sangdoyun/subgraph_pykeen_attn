@@ -1,0 +1,160 @@
+import os
+import pandas as pd
+from rdflib import Graph, Namespace, URIRef, Literal
+from rdflib.namespace import RDF, XSD
+
+# Create graph
+g = Graph()
+
+# Namespaces
+EX = Namespace("http://example.org/")
+SOSA = Namespace("http://www.w3.org/ns/sosa/")
+SCHEMA = Namespace("http://schema.org/")
+g.bind("ex", EX)
+g.bind("sosa", SOSA)
+g.bind("schema", SCHEMA)
+
+# Base folder where all modality folders are
+BASE_FOLDER = "path_to_data_folder"  # CHANGE THIS!
+
+# Student ID (e.g., u00)
+student_id = "u00"
+student_uri = EX[f"Student_{student_id}"]
+
+# Register the student
+g.add((student_uri, RDF.type, SCHEMA.Person))
+
+# Function to create URI for each observation
+def create_obs_uri(modality, idx):
+    return EX[f"{modality.capitalize()}Obs_{idx}"]
+
+# ------------ Readers per modality ------------
+
+def process_gps(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("gps", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.CurrentLocation))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(f"{row['latitude']},{row['longitude']}")))
+
+def process_wifi(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("wifi", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.ConnectedWiFi))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(row['ssid'])))
+
+def process_wifi_location(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("wifi_location", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.IndoorLocation))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(f"{row['building_id']}, Room {row['room_id']}")))
+
+def process_phonelock(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("phonelock", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.PhoneLockState))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        lock_state = "Locked" if row['event'] == 1 else "Unlocked"
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(lock_state)))
+
+def process_phonecharge(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("phonecharge", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.ChargingEvent))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        charge_state = "ChargingStarted" if row['battery_state'] == 2 else "NotCharging"
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(charge_state)))
+
+def process_bt(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        obs_uri = create_obs_uri("bt", idx)
+        g.add((obs_uri, RDF.type, SOSA.Observation))
+        g.add((obs_uri, SOSA.hasFeatureOfInterest, student_uri))
+        g.add((obs_uri, SOSA.observedProperty, EX.BluetoothNearby))
+        g.add((obs_uri, SOSA.resultTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        g.add((obs_uri, SOSA.hasSimpleResult, Literal(row['device_name'])))
+
+def process_sms(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        sms_uri = EX[f"SMS_{idx}"]
+        g.add((sms_uri, RDF.type, SCHEMA.Message))
+        g.add((sms_uri, SCHEMA.sender, student_uri))
+        g.add((sms_uri, SCHEMA.recipient, Literal(row['recv_address'])))
+        g.add((sms_uri, SCHEMA.dateSent, Literal(row['timestamp'], datatype=XSD.dateTime)))
+        g.add((sms_uri, SCHEMA.text, Literal(row['message'])))
+
+def process_call_log(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        call_uri = EX[f"Call_{idx}"]
+        g.add((call_uri, RDF.type, SCHEMA.CommunicateAction))
+        g.add((call_uri, SCHEMA.agent, student_uri))
+        g.add((call_uri, SCHEMA.participant, Literal(row['other_number'])))
+        g.add((call_uri, SCHEMA.startTime, Literal(row['timestamp'], datatype=XSD.dateTime)))
+
+def process_calendar(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        event_uri = EX[f"CalendarEvent_{idx}"]
+        g.add((event_uri, RDF.type, SCHEMA.Event))
+        g.add((event_uri, SCHEMA.attendee, student_uri))
+        g.add((event_uri, SCHEMA.startDate, Literal(row['start_time'], datatype=XSD.dateTime)))
+        g.add((event_uri, SCHEMA.name, Literal(row['event_title'])))
+        g.add((event_uri, SCHEMA.location, Literal(row['location'])))
+
+def process_app_usage(folder):
+    df = pd.read_csv(folder)
+    for idx, row in df.iterrows():
+        app_uri = EX[f"AppUsage_{idx}"]
+        g.add((app_uri, RDF.type, SCHEMA.SoftwareApplication))
+        g.add((app_uri, SCHEMA.user, student_uri))
+        g.add((app_uri, SCHEMA.name, Literal(row['app_name'])))
+        g.add((app_uri, SCHEMA.dateModified, Literal(row['timestamp'], datatype=XSD.dateTime)))
+
+# ------------ Batch process ------------
+
+# Map folder name to function
+modality_processors = {
+    "gps": process_gps,
+    "wifi": process_wifi,
+    "wifi_location": process_wifi_location,
+    "phonelock": process_phonelock,
+    "phonecharge": process_phonecharge,
+    "bt": process_bt,
+    "sms": process_sms,
+    "call_log": process_call_log,
+    "calendar": process_calendar,
+    "app_usage_running_app": process_app_usage
+}
+
+# Process each folder
+for modality, processor in modality_processors.items():
+    folder_path = os.path.join(BASE_FOLDER, modality, f"{modality}_{student_id}.csv")
+    if os.path.exists(folder_path):
+        processor(folder_path)
+    else:
+        print(f"Warning: {folder_path} not found!")
+
+# ------------ Save the graph ------------
+
+g.serialize(destination=f"student_{student_id}_tkg.ttl", format="turtle")
+print("✅ Temporal KG saved!")
