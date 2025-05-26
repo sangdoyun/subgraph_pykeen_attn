@@ -1,71 +1,175 @@
-# Remove haversine dependency since it's not used in current code
+
 import pandas as pd
-import numpy as np
-from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import StandardScaler
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
-# Simulated df_pic data for moment detection
-df_pic = pd.DataFrame({
-    "id": ["a1", "a2", "a3", "a4", "a5", "a6"],
-    "start_time": pd.to_datetime([
-        "2023-01-01T10:00", "2023-01-01T10:10", "2023-01-01T10:30",
-        "2023-01-01T15:00", "2023-01-01T15:15", "2023-01-01T15:40"
-    ]),
-    "end_time": pd.to_datetime([
-        "2023-01-01T10:05", "2023-01-01T10:20", "2023-01-01T10:35",
-        "2023-01-01T15:10", "2023-01-01T15:25", "2023-01-01T15:50"
-    ]),
-    "images": [["img1", "img2"], ["img3"], ["img4"], ["img5", "img6", "img7"], ["img8"], ["img9"]],
-    "location": ["Paris"] * 6,
-    "lat": [48.8584, 48.8585, 48.8586, 48.8600, 48.8602, 48.8603],
-    "lon": [2.2945, 2.2946, 2.2947, 2.2950, 2.2951, 2.2952],
-    "scenes": [["monument", "group"], ["group"], ["selfie"], ["sunset"], ["monument"], ["monument"]],
-    "faces": [["f1", "f2"], ["f1", "f2"], ["f1"], ["f2", "f3"], ["f2"], ["f2"]]
-})
+# Dates from Sept 1 to Sept 10
+date_range = [datetime(2024, 9, 1) + timedelta(days=i) for i in range(10)]
 
-# Feature computation
-df_pic["duration"] = (df_pic["end_time"] - df_pic["start_time"]).dt.total_seconds()
-df_pic["face_count"] = df_pic["faces"].apply(len)
-df_pic["scene_count"] = df_pic["scenes"].apply(lambda x: len(set(x)))
-df_pic["image_count"] = df_pic["images"].apply(len)
-df_pic["center_time"] = df_pic["start_time"] + (df_pic["end_time"] - df_pic["start_time"]) / 2
-df_pic["timestamp"] = df_pic["center_time"].astype(np.int64) // 10**9
+# Define City for each day
+city_by_day = ["City1"]*4 + ["City2"]*4 + ["City1"]*2
 
-# Spatial-temporal clustering
-X = df_pic[["timestamp", "lat", "lon"]]
-X_scaled = StandardScaler().fit_transform(X)
-dbscan = DBSCAN(eps=1.0, min_samples=2).fit(X_scaled)
-df_pic["cluster"] = dbscan.labels_
+# Simulate data tables
+images_data = []
+calls_data = []
+location_data = []
+payments_data = []
 
-# Aggregate clusters into moments
-moments = []
-for c_id in sorted(df_pic["cluster"].unique()):
-    if c_id == -1:
-        continue
-    group = df_pic[df_pic["cluster"] == c_id]
-    start = group["start_time"].min()
-    end = group["end_time"].max()
-    loc = group["location"].mode()[0]
-    scenes = list(set([s for sub in group["scenes"] for s in sub]))
-    faces = list(set([f for sub in group["faces"] for f in sub]))
-    images = list(set([i for sub in group["images"] for i in sub]))
-    score = (
-        0.3 * group["face_count"].sum() +
-        0.25 * len(scenes) +
-        0.2 * group["image_count"].sum() +
-        0.15 * group["duration"].sum() +
-        0.1 * np.mean(group["timestamp"])
-    ) / 100  # normalization for scale
-    moments.append({
-        "moment_id": f"m{c_id}",
-        "start_time": start,
-        "end_time": end,
-        "location": loc,
-        "scenes": scenes,
-        "faces": faces,
-        "images": images,
-        "score": round(score, 3)
+for i, date in enumerate(date_range):
+    date_str = date.strftime('%Y-%m-%d')
+    city = city_by_day[i]
+    
+    # Simulate images
+    for j in range(random.randint(1, 3 if city == "City2" else 1)):
+        images_data.append({
+            "date": date_str,
+            "image_id": f"img_{i}_{j}",
+            "scene": random.choice(["monument", "food", "cityscape", "selfie"]),
+            "faces": random.choice(["solo", "family", "group"]),
+            "location": city
+        })
+    
+    # Simulate calls
+    for j in range(random.randint(1, 2)):
+        calls_data.append({
+            "date": date_str,
+            "call_id": f"call_{i}_{j}",
+            "duration_min": random.choice([2, 5, 10, 15]),
+            "contact": random.choice(["Home", "Friend", "Work", "Hotel"]),
+            "location": city
+        })
+    
+    # Location ping (once per day)
+    location_data.append({
+        "date": date_str,
+        "lat": random.uniform(28.60, 28.62) if city == "City1" else random.uniform(48.85, 48.87),
+        "lon": random.uniform(77.20, 77.22) if city == "City1" else random.uniform(2.35, 2.37),
+        "city": city
+    })
+    
+    # Simulate payments
+    for j in range(random.randint(1, 2 if city == "City2" else 1)):
+        payments_data.append({
+            "date": date_str,
+            "merchant": random.choice(["Cafe", "Uber", "Museum", "Restaurant", "Store"]),
+            "amount": random.randint(5, 50),
+            "location": city
+        })
+
+# Convert to DataFrames
+df_images = pd.DataFrame(images_data)
+df_calls = pd.DataFrame(calls_data)
+df_location = pd.DataFrame(location_data)
+df_payments = pd.DataFrame(payments_data)
+
+df_images.head(), df_calls.head(), df_location.head(), df_payments.head()
+
+
+import pandas as pd
+import random
+from datetime import datetime, timedelta
+from rdflib import Graph, Namespace, URIRef, Literal
+from rdflib.namespace import XSD
+
+# Re-generate the previously created data
+date_range = [datetime(2024, 9, 1) + timedelta(days=i) for i in range(10)]
+city_by_day = ["City1"]*4 + ["City2"]*4 + ["City1"]*2
+images_data, calls_data, location_data, payments_data = [], [], [], []
+
+for i, date in enumerate(date_range):
+    date_str = date.strftime('%Y-%m-%d')
+    city = city_by_day[i]
+
+    for j in range(random.randint(1, 3 if city == "City2" else 1)):
+        images_data.append({
+            "date": date_str,
+            "image_id": f"img_{i}_{j}",
+            "scene": random.choice(["monument", "food", "cityscape", "selfie"]),
+            "faces": random.choice(["solo", "family", "group"]),
+            "location": city
+        })
+
+    for j in range(random.randint(1, 2)):
+        calls_data.append({
+            "date": date_str,
+            "call_id": f"call_{i}_{j}",
+            "duration_min": random.choice([2, 5, 10, 15]),
+            "contact": random.choice(["Home", "Friend", "Work", "Hotel"]),
+            "location": city
+        })
+
+    location_data.append({
+        "date": date_str,
+        "lat": random.uniform(28.60, 28.62) if city == "City1" else random.uniform(48.85, 48.87),
+        "lon": random.uniform(77.20, 77.22) if city == "City1" else random.uniform(2.35, 2.37),
+        "city": city
     })
 
-moments
+    for j in range(random.randint(1, 2 if city == "City2" else 1)):
+        payments_data.append({
+            "date": date_str,
+            "merchant": random.choice(["Cafe", "Uber", "Museum", "Restaurant", "Store"]),
+            "amount": random.randint(5, 50),
+            "location": city
+        })
+
+df_images = pd.DataFrame(images_data)
+df_calls = pd.DataFrame(calls_data)
+df_location = pd.DataFrame(location_data)
+df_payments = pd.DataFrame(payments_data)
+
+# Define Namespaces for TKG
+NS = Namespace("http://example.org/")
+IMG = Namespace("http://example.org/image/")
+CALL = Namespace("http://example.org/call/")
+LOC = Namespace("http://example.org/location/")
+PAY = Namespace("http://example.org/payment/")
+TIME = Namespace("http://example.org/time/")
+REL = Namespace("http://example.org/relation/")
+SCN = Namespace("http://example.org/scene/")
+FACE = Namespace("http://example.org/face/")
+
+# Function to create a daily TKG
+def create_daily_tkg(date_str):
+    g = Graph()
+    g.bind("ns", NS)
+    for row in df_images[df_images["date"] == date_str].itertuples():
+        img = URIRef(f"{IMG}{row.image_id}")
+        g.add((NS.Person1, REL.appearsIn, img))
+        g.add((img, REL.hasScene, URIRef(f"{SCN}{row.scene}")))
+        g.add((img, REL.hasFace, URIRef(f"{FACE}{row.faces}_{row.image_id}")))
+        g.add((img, REL.hasLoc, Literal(row.location)))
+        g.add((img, TIME.timestamp, Literal(date_str, datatype=XSD.date)))
+
+    for row in df_calls[df_calls["date"] == date_str].itertuples():
+        call = URIRef(f"{CALL}{row.call_id}")
+        g.add((NS.Person1, REL.madeCall, call))
+        g.add((call, REL.callWith, Literal(row.contact)))
+        g.add((call, REL.durationMin, Literal(row.duration_min, datatype=XSD.integer)))
+        g.add((call, REL.hasLoc, Literal(row.location)))
+        g.add((call, TIME.timestamp, Literal(date_str, datatype=XSD.date)))
+
+    for row in df_payments[df_payments["date"] == date_str].itertuples():
+        pay = URIRef(f"{PAY}{row.Index}")
+        g.add((NS.Person1, REL.madePayment, pay))
+        g.add((pay, REL.amount, Literal(row.amount, datatype=XSD.integer)))
+        g.add((pay, REL.merchant, Literal(row.merchant)))
+        g.add((pay, REL.hasLoc, Literal(row.location)))
+        g.add((pay, TIME.timestamp, Literal(date_str, datatype=XSD.date)))
+
+    for row in df_location[df_location["date"] == date_str].itertuples():
+        loc = URIRef(f"{LOC}{row.date}")
+        g.add((NS.Person1, REL.wasAt, loc))
+        g.add((loc, REL.lat, Literal(row.lat)))
+        g.add((loc, REL.lon, Literal(row.lon)))
+        g.add((loc, REL.city, Literal(row.city)))
+        g.add((loc, TIME.timestamp, Literal(row.date, datatype=XSD.date)))
+
+    return g
+
+# Create TKGs for each day
+tkg_by_day = {date: create_daily_tkg(date) for date in df_location["date"].tolist()}
+
+# Show snapshot for Sept 5
+sample_tkg = tkg_by_day["2024-09-05"].serialize(format="turtle")
+sample_tkg.splitlines()[:30]
