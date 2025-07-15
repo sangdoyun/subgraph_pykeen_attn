@@ -1,156 +1,241 @@
-from rdflib import URIRef
-import networkx as nx
+import random
+import uuid
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
 
-def extract_graph_edges_for_centrality(graph):
-    G = nx.DiGraph()
-    for s, p, o in graph:
-        if isinstance(s, URIRef) and isinstance(o, URIRef):
-            G.add_edge(str(s), str(o), predicate=str(p))
-    return G
+# --- Helper Functions ---
+def random_time(start, end):
+    """Generate a random datetime between two datetimes."""
+    return start + timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
 
-def find_centrality_anchors(graph, top_k=10):
-    G_nx = extract_graph_edges_for_centrality(graph)
-    centrality = nx.degree_centrality(G_nx)
-    sorted_nodes = sorted(centrality.items(), key=lambda x: x[1], reverse=True)
-    return [node for node, score in sorted_nodes[:top_k]]
+def generate_face_data(num_faces):
+    faces = []
+    for _ in range(num_faces):
+        face_id = str(uuid.uuid4())
+        age = random.randint(1, 80)
+        gender = random.choice(["male", "female"])
+        bbox = {
+            "x": random.randint(0, 500),
+            "y": random.randint(0, 500),
+            "width": random.randint(50, 100),
+            "height": random.randint(50, 100)
+        }
+        faces.append({
+            "face_id": face_id,
+            "age": age,
+            "gender": gender,
+            "bbox": bbox
+        })
+    return faces
 
-from collections import defaultdict
+def growth_kernel(t, t0=0, slope=0.05):
+    return slope * (t - t0)
 
-def find_path_based_anchors(graph, max_depth=3, min_freq=3):
-    freq_count = defaultdict(int)
-    
-    def dfs(node, depth, visited):
-        if depth > max_depth:
-            return
-        visited.add(node)
-        freq_count[str(node)] += 1
-        for _, _, neighbor in graph.triples((node, None, None)):
-            if isinstance(neighbor, URIRef) and neighbor not in visited:
-                dfs(neighbor, depth + 1, visited.copy())
+def decay_kernel(t, t0=0, alpha=0.5):
+    return alpha * np.exp(-0.1 * (t - t0))
 
-    for s in set(graph.subjects()):
-        if isinstance(s, URIRef):
-            dfs(s, 0, set())
+def stable_kernel(t, base=0.2):
+    return base
 
-    # Select top nodes with freq above threshold
-    path_anchors = [node for node, count in freq_count.items() if count >= min_freq]
-    return path_anchors
+# --- Image Event Simulation ---
+def simulate_images(user_id, start_date, num_days, behavior_type, poi_list, scene_list, max_per_day=5):
+    image_data = []
+    base_time = datetime.strptime(start_date, "%Y-%m-%d")
+
+    for day in range(num_days):
+        date = base_time + timedelta(days=day)
+        # Determine intensity
+        if behavior_type == "growing":
+            intensity = min(int(growth_kernel(day) * max_per_day), max_per_day)
+        elif behavior_type == "decaying":
+            intensity = max(1, int(decay_kernel(day) * max_per_day))
+        else:
+            intensity = int(stable_kernel(day) * max_per_day)
+
+        for _ in range(intensity):
+            timestamp = random_time(date, date + timedelta(days=1))
+            location = {
+                "lat": round(random.uniform(-90, 90), 6),
+                "lon": round(random.uniform(-180, 180), 6),
+                "poi": random.choice(poi_list),
+                "city": random.choice(["NYC", "LA", "SF", "Chicago"]),
+                "state": random.choice(["NY", "CA", "IL"]),
+                "country": "USA"
+            }
+            faces = generate_face_data(random.randint(1, 3))
+            scene = random.choice(scene_list)
+            image_data.append({
+                "user_id": user_id,
+                "timestamp": timestamp,
+                "location": location,
+                "faces": faces,
+                "scene": scene,
+                "ground_truth": f"routine:{behavior_type}"
+            })
+    return image_data
 
 
-# Centrality anchors
-centrality_anchors = find_centrality_anchors(g, top_k=10)
 
-# Path-based anchors
-path_anchors = find_path_based_anchors(g, max_depth=3, min_freq=3)
+# --- Run Simulation for One User ---
+user_id = "U001"
+start_date = "2025-06-01"
+num_days = 30
+poi_list = ["Home", "Office", "Park", "Mall", "Beach"]
+scene_list = ["indoor", "outdoor", "nature", "urban"]
 
-# Combine all types
-all_anchors = set(loc_uris) | set(centrality_anchors) | set(path_anchors)
+# Simulate different behaviors
+images_growing = simulate_images(user_id, start_date, num_days, "growing", poi_list, scene_list)
+images_decaying = simulate_images(user_id, start_date, num_days, "decaying", poi_list, scene_list)
+images_stable = simulate_images(user_id, start_date, num_days, "stable", poi_list, scene_list)
 
-def compute_centrality_graph(g_rdf):
-    G_nx = nx.DiGraph()
-    for s, p, o in g_rdf:
-        if isinstance(s, URIRef) and isinstance(o, URIRef):
-            G_nx.add_edge(str(s), str(o), label=str(p))
-    centrality = nx.degree_centrality(G_nx)
-    return centrality
-    
-def detect_centrality_anchors(g_today, g_yesterday, threshold=0.2):
-    c_today = compute_centrality_graph(g_today)
-    c_yest = compute_centrality_graph(g_yesterday)
+# Combine all
+all_images = images_growing + images_decaying + images_stable
 
-    anchors = []
-    for node in c_today:
-        delta = abs(c_today.get(node, 0) - c_yest.get(node, 0))
-        if delta > threshold:
-            anchors.append(node)
-    return anchors
+# Convert to DataFrame (simplified for tabular view)
+df_images = pd.DataFrame([{
+    "user_id": img["user_id"],
+    "timestamp": img["timestamp"],
+    "lat": img["location"]["lat"],
+    "lon": img["location"]["lon"],
+    "poi": img["location"]["poi"],
+    "city": img["location"]["city"],
+    "state": img["location"]["state"],
+    "country": img["location"]["country"],
+    "scene": img["scene"],
+    "face_ids": [f["face_id"] for f in img["faces"]],
+    "ground_truth": img["ground_truth"]
+} for img in all_images])
 
-def find_frequent_path_nodes(graph_snapshots, path_len=3, freq_threshold=3):
-    path_count = defaultdict(int)
+df_images.head()
 
-    for g in graph_snapshots:
-        G_nx = nx.DiGraph()
-        for s, p, o in g:
-            if isinstance(s, URIRef) and isinstance(o, URIRef):
-                G_nx.add_edge(str(s), str(o))
 
-        for node in G_nx.nodes:
-            for path in nx.single_source_simple_paths(G_nx, node, cutoff=path_len):
-                for n in path:
-                    path_count[n] += 1
+import numpy as np
+import pandas as pd
+import random
+import uuid
+from datetime import datetime, timedelta
 
-    anchors = [node for node, count in path_count.items() if count >= freq_threshold]
-    return anchors
+# --- Core Time Model ---
+def generate_time_range(start_date, num_days):
+    base_time = datetime.strptime(start_date, "%Y-%m-%d")
+    return [base_time + timedelta(days=i) for i in range(num_days)]
 
-from rdflib import Graph, URIRef, Namespace, RDF, Literal, XSD
-from datetime import datetime
-import networkx as nx
-from pyvis.network import Network
+# --- Kernel Functions ---
+def intensity_function(behavior_type, t, t0=0, base=0.5, alpha=0.5, slope=0.05):
+    if behavior_type == "growing":
+        return min(1.0, slope * (t - t0))
+    elif behavior_type == "decaying":
+        return max(0.1, alpha * np.exp(-0.1 * (t - t0)))
+    else:
+        return base
 
-EX = Namespace("http://example.org/")  # Replace with actual
+# --- Users and Contact Metadata ---
+def generate_user_profiles(n_users):
+    users = []
+    for i in range(n_users):
+        user_id = f"U{str(i+1).zfill(3)}"
+        contacts = [f"C{str(j+1).zfill(3)}" for j in range(5)]
+        relations = ["friend", "colleague", "family", "acquaintance", "partner"]
+        contact_book = [{
+            "contact_id": c,
+            "relation": random.choice(relations)
+        } for c in contacts]
+        users.append({
+            "user_id": user_id,
+            "contacts": contact_book
+        })
+    return users
 
-# Load original RDF graph
-g = Graph()
-g.parse("reified_2_day_tkg_img.ttl", format="ttl")
+# --- Call Logs Generator ---
+def simulate_call_logs(users, start_date, num_days, behavior_type):
+    logs = []
+    for user in users:
+        for day in range(num_days):
+            intensity = int(10 * intensity_function(behavior_type, day))
+            for _ in range(intensity):
+                timestamp = random_time(
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day),
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day+1)
+                )
+                contact = random.choice(user["contacts"])
+                duration = random.randint(30, 300)
+                logs.append({
+                    "user_id": user["user_id"],
+                    "timestamp": timestamp,
+                    "callee": contact["contact_id"],
+                    "duration_sec": duration,
+                    "relation": contact["relation"],
+                    "ground_truth": f"social:{behavior_type}"
+                })
+    return logs
 
-# --- Utility ---
-def extract_time(graph, event):
-    for t in graph.objects(event, EX.hasTimestamp):
-        if isinstance(t, Literal) and t.datatype == XSD.dateTime:
-            return datetime.fromisoformat(str(t))
-    return None
+# --- App Usage Generator ---
+def simulate_app_usage(users, start_date, num_days, behavior_type, apps=["YouTube", "Gmail", "Instagram", "Maps"]):
+    logs = []
+    for user in users:
+        for day in range(num_days):
+            intensity = int(10 * intensity_function(behavior_type, day))
+            for _ in range(intensity):
+                timestamp = random_time(
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day),
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day+1)
+                )
+                app = random.choice(apps)
+                duration = random.randint(1, 30)
+                logs.append({
+                    "user_id": user["user_id"],
+                    "timestamp": timestamp,
+                    "app": app,
+                    "duration_min": duration,
+                    "ground_truth": f"interest:{behavior_type}"
+                })
+    return logs
 
-def score_node(graph, node):
-    score = 0
-    if (node, RDF.type, EX.Person) in graph: score += 3
-    if (node, RDF.type, EX.Location) in graph: score += 2
-    if (node, RDF.type, EX.Image) in graph: score += 1
-    if (node, EX.hasTimestamp, None) in graph: score += 1
-    return score
+# --- Calendar Events Generator ---
+def simulate_calendar_events(users, start_date, num_days, behavior_type, event_types=["meeting", "gym", "birthday", "travel", "study"]):
+    logs = []
+    for user in users:
+        for day in range(num_days):
+            intensity = int(5 * intensity_function(behavior_type, day))
+            for _ in range(intensity):
+                timestamp = random_time(
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day),
+                    datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=day+1)
+                )
+                event = random.choice(event_types)
+                location = random.choice(["Home", "Work", "Cafe", "Gym"])
+                logs.append({
+                    "user_id": user["user_id"],
+                    "timestamp": timestamp,
+                    "event_type": event,
+                    "location": location,
+                    "ground_truth": f"routine:{behavior_type}"
+                })
+    return logs
 
-# --- Core extraction ---
-def extract_rdf_subgraph(graph, anchor_uri, delta_t=1, k_hops=2, score_threshold=1):
-    anchor_events = set(s for s, p, o in graph.triples((None, None, anchor_uri))).union(
-        set(s for s, p, o in graph.triples((anchor_uri, None, None)))
-    )
-    anchor_times = [extract_time(graph, e) for e in anchor_events if extract_time(graph, e)]
-    print (anchor_times)
+# --- Simulation Execution ---
+NUM_USERS = 3
+NUM_DAYS = 30
+START_DATE = "2025-06-01"
 
-    E_t = set()
-    for e in graph.subjects(RDF.type, EX.Event):
-        t = extract_time(graph, e)
-        if t and any(abs((t - ta).days) <= delta_t for ta in anchor_times):
-            E_t.add(e)
+users = generate_user_profiles(NUM_USERS)
 
-    E_prime = anchor_events.union(E_t)
+# Simulate each modality for all behavior types
+call_logs = simulate_call_logs(users, START_DATE, NUM_DAYS, "growing") + \
+            simulate_call_logs(users, START_DATE, NUM_DAYS, "decaying") + \
+            simulate_call_logs(users, START_DATE, NUM_DAYS, "stable")
 
-    # Create new RDF subgraph
-    subg = Graph()
-    visited = set()
-    frontier = set(E_prime)
+app_usage = simulate_app_usage(users, START_DATE, NUM_DAYS, "growing") + \
+            simulate_app_usage(users, START_DATE, NUM_DAYS, "decaying") + \
+            simulate_app_usage(users, START_DATE, NUM_DAYS, "stable")
 
-    def add_related_triples(entity):
-        for s, p, o in graph.triples((entity, None, None)):
-            subg.add((s, p, o))
-            if isinstance(o, URIRef):
-                frontier.add(o)
-        for s, p, o in graph.triples((None, None, entity)):
-            subg.add((s, p, o))
-            if isinstance(s, URIRef):
-                frontier.add(s)
+calendar_events = simulate_calendar_events(users, START_DATE, NUM_DAYS, "growing") + \
+                  simulate_calendar_events(users, START_DATE, NUM_DAYS, "decaying") + \
+                  simulate_calendar_events(users, START_DATE, NUM_DAYS, "stable")
 
-    for e in E_prime:
-        add_related_triples(e)
-        visited.add(e)
+# Convert to DataFrames
+df_calls = pd.DataFrame(call_logs)
+df_apps = pd.DataFrame(app_usage)
+df_calendar = pd.DataFrame(calendar_events)
 
-    for _ in range(k_hops):
-        next_frontier = set()
-        for node in frontier:
-            if node in visited:
-                continue
-            if score_node(graph, node) >= score_threshold:
-                add_related_triples(node)
-                visited.add(node)
-        frontier = next_frontier
-
-    return subg
