@@ -106,3 +106,73 @@ ContextGraph uses the Lens module on real smartphone lifelog data (Gallery image
 **ContextGraph** successfully models multimodal lifelog data as TKGs, leveraging **DCE** for robust, holistic daily representations, and the **Lens module** for longitudinal reasoning. This enables intelligence beyond simple retrieval, providing **actionable insights** into behavioral drifts and lifestyle changes.
 
 **Key Takeaway:** ContextGraph shifts lifelog systems from merely recording events to actively analyzing **evolving behaviors**.
+
+
+========
+# ContextGraph: Lifelog Intelligence Framework for Contextual Subgraph Evolution
+
+**Anil Sharma, Gunturi Venkata Sai Phani Kiran, et al.**
+*Samsung R&D Institute India-Bangalore (SRI-B)*
+
+---
+
+## 1. Motivation
+
+*   Lifelogging requires continuous and comprehensive recording of user activities (location, interactions, health) via smartphones.
+*   The goal is to move beyond simple data retrieval (e.g., searching past experiences) to **infer, track, and explain changes in user behavior** over time.
+*   This necessitates capturing deeper temporal contexts and evolving life patterns.
+
+## 2. Problem Statement
+
+*   **Behavioral Reasoning Gap:** Existing lifelogging systems emphasize memory recall but lack the ability to **reason about behavior evolution**, such as forming habits or detecting gradual lifestyle changes.
+*   **Data Challenges:** Smartphone data is inherently **fragmented, heterogeneous, and sparse**, complicating unified analysis.
+*   **Static Modeling:** Traditional Personal Knowledge Graphs (PKGs) typically construct static graphs, failing to model the essential temporal dynamics required to understand evolving user routines.
+
+## 3. Our Contributions
+
+*   **Temporal Knowledge Graph (TKG):** Modeling of smartphone multimodal data as a time-aware, evolving RDF graph to represent dynamic entity relationships.
+*   **Day Context Embeddings (DCE):** Novel latent vectors (128D) that encode both **temporal dynamics** (when) and **contextual nuances** (whom, where, what) using a dual VAE network.
+*   **The Lens Module:** A core mechanism to extract semantically meaningful subgraphs (life-aspects) by identifying **volatile anchor nodes** that signal behavioral changes.
+*   **Evolution Signature:** A dual similarity-based method (Graph-level $M_G$ and Node-level $M_N$) to classify subgraph changes as **growth, decay, drift, or stable evolution**, enabling actionable insights into behavioral stability or change.
+
+## 4. Methodology: ContextGraph Framework
+
+### A. Day Context Embeddings (DCE)
+
+DCE uses a dual VAE architecture to compute a holistic embedding ($z_d$) for each daily TKG snapshot ($G_d$).
+
+*   **Temporal-VAE (64D):**
+    *   **Function:** Captures the day’s temporal rhythm and spread (sequence and timing of events).
+    *   **Architecture:** Bidirectional LSTM encoder.
+*   **Context-GVAE (64D):**
+    *   **Function:** Encodes the heterogeneous graph structure and semantics (who, where, what).
+    *   **Architecture:** Heterogeneous Graph Attention Network (HAN) encoder.
+*   **Aggregation:** Fusion of both VAE outputs forms the Aggregate DCE (128D), providing a more comprehensive representation than structural or temporal data alone.
+
+### B. Lens Module: Subgraph Tracking
+
+Lens monitors TKG evolution by focusing on changes around "anchor nodes".
+
+*   **Anchor Selection:** Identifies persistent nodes ($v \in V_p$) whose DCE node embedding exhibits an abrupt change, exceeding a threshold ($\tau_v = 0.8$), signaling a sudden contextual shift (e.g., new locations, payment spikes).
+*   **Subgraph Expansion:** A contextual subgraph is expanded up to $k$-hops around the anchor ($a$). Nodes/edges are included based on a **context-aware attention score** $\kappa(a, p, o)$ (Equation 10) derived from DCE embeddings.
+*   **Evolution Signature:** The change between two subgraph snapshots ($S_{d1}$ and $S_{d2}$) is classified based on thresholds ($\theta_G=0.7$, $\theta_N=0.8$):
+    *   **Static:** Both Graph ($M_G$) and Node ($M_N$) similarity are high.
+    *   **Growing:** Structure ($M_G$) is stable, but new entities/values are added ($M_N \leq \theta_N$).
+    *   **Decay:** Both structure and values have changed significantly (both $M_G \leq \theta_G$ and $M_N \leq \theta_N$).
+
+## 5. Key Results
+
+*   **Superior Embedding Quality:** DCE (Aggregate) **outperforms state-of-the-art baselines** (DeepWalk, Node2Vec, HAN) in classification tasks on both TPP-derived data (F1-score 0.708) and public datasets (DBLP Macro-F1 0.89).
+*   **Efficiency:** DCE reduces embedding computation time by **87.5%** (8 seconds vs. 100 seconds for Node2Vec/DeepWalk).
+*   **Discrimination:** t-SNE plots confirm DCE successfully separates activities (e.g., "evening run" and "family event") that share similar temporal dynamics but differ contextually.
+*   **Trend Prediction:** The Lens module accurately predicts behavioral trends, such as detecting **Growing** activities (Avg. Size Change: 27.24%, Avg. Jaccard Sim: 0.79) or **Decaying** activities (Avg. Size Change: -23.75%, Avg. Jaccard Sim: 0.76) on real smartphone data.
+*   **Travel Inference:** Lens uses decaying subgraphs around a previous location to signal departure and growing subgraphs at a new location to indicate arrival and prolonged stay.
+
+## 6. Conclusion
+
+*   ContextGraph successfully leverages Temporal Knowledge Graphs (TKGs) and Day Context Embeddings (DCE) to model fragmented lifelog data.
+*   The Lens module delivers sophisticated lifelog intelligence by tracking specific, context-aware subgraph evolution, allowing the system to reason about behavioral routines and lifestyle shifts.
+
+## References
+
+*   *Citations refer directly to the source passages used.*
