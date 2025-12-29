@@ -1,35 +1,27 @@
-This architecture aims to solve critical challenges in personalized AI, specifically the failure of current models to perform "Preference Grounded" abductive reasoning (inferring why a user acts based on preferences) and maintaining "Identity-Constrained" personalization despite visual changes over time.
-The significant novelty of this refined flow, versus standard Retrieval-Augmented Generation (RAG), is that it moves personalization from a simple text-append at the end to an active constraint applied throughout the visual perception and reasoning stages. It uses a geometric "Constraint Manifold" (\mathcal{M}) derived from the user's Knowledge Graph (PKG) to align visual features and penalize attention mechanisms that contradict established user facts, thereby preventing relational hallucinations.
-Here is a breakdown of the roles and responsibilities of each block, illustrated with the example of a user holding a cup of coffee at 11 PM, where the goal is to understand they are drinking decaf for sleep.
-Running Example Inputs
- * Input Image (V_{raw}): User holding a mug at 11 PM.
- * Query (Q): "What is user doing?".
- * PKG: Contains 10 years of data, including the fact: "User purchases Decaf Blend coffee and values sleep."
-Block 1: PKG Knowledge Extraction
-Role: To efficiently retrieve highly relevant, persistent context from a massive longitudinal PKG without overwhelming the system with irrelevant noise. It defines the geometric "boundaries of truth" for the specific user.
- * Sub-blocks & Actions:
-   * Entity Extraction & Gating Signal: Detects "cup," "user," and the time "11 PM" in the inputs to create a signal that triggers specific parts of the graph.
-   * Saliency Triggered Pruning & Temporal Identity Gating: Uses the signal to prune the 10-year data, ignoring irrelevant history (e.g., a 5-year-old daytime coffee habit) and focusing on nighttime beverage preferences.
-   * Temporal GGNN with Gated Activation: Processes the pruned graph to extract the precise relationship: "User drinks decaf at night."
- * Example Outputs:
-   * Personal Context Vector (C_{pers}): A latent vector summarizing "Nighttime decaf preference".
-   * Constraint Manifold (\mathcal{M}): A geometric representation defining the boundaries of truth (e.g., a subspace where "drinking at 11 PM" aligns with "decaf" and contradicts "caffeine").
-Block 2: Identity Invariant Manifold Projection
-Role: To ensure visual perception is conditioned on persistent identity and user facts, rather than just raw pixels. This solves "Identity-Constrained" issues where visual changes (like lighting or aging) confuse generic models.
- * Sub-blocks & Actions:
-   * Frozen ViT: Processes the image into generic raw visual tokens (V_{raw}).
-   * Manifold Alignment: Projects these raw tokens onto the Constraint Manifold (\mathcal{M}). This mathematically adjusts the visual features to align with the user's established reality.
- * Example Action: The raw pixels of the cup are projected onto \mathcal{M}. Because \mathcal{M} defines nighttime drinking as "decaf," the visual features are adjusted to represent "a personalized decaf vessel" rather than just a generic mug.
- * Example Output: KG Constrained Visual Features (V'_{KG})—visual representations that are now invariant to superficial changes and aligned with KG facts.
-Block 3: Abductive Cformer
-Role: To perform the actual "abductive reasoning" (the why). It bridges the linguistic query with the visual evidence, using personal context to direct attention only to factually consistent features.
- * Sub-blocks & Actions:
-   * Query Fusion MLP: Combines the generic query "What is user doing?" (Q) with the specific context "Nighttime decaf preference" (C_{pers}) to create a Context Seeded Query (Q_{seed}) (essentially, "Look for visual evidence of decaf drinking").
-   * Manifold Constrained Cross-Attention (MCCA): The seeded query attends to the constrained visual features (V'_{KG}). Crucially, this attention is penalized by \mathcal{M}. If the model tries to attend to features suggesting "caffeine energy," the manifold increases the penalty, suppressing that interpretation. Attention is focused only on features aligning with "decaf".
- * Example Output: Personalized Visual Tokens (\mathcal{T}_{pers})—a highly compressed visual summary meaning "Evidence of user drinking decaf".
-Block 4: Personalized Response Generation
-Role: To generate the final natural language response. Because the input tokens are already deeply constrained by user facts, the frozen LLM is prevented from hallucinating incorrect relationships.
- * Sub-blocks & Actions:
-   * Frozen LLM with Prompt Finetuning: Receives the original query (Q) and the fact-constrained visual tokens (\mathcal{T}_{pers}) as a prefix.
-   * User Facts Grounded Reasoning: The LLM decodes the tokens. Since the visual information is already restricted to "decaf evidence," the LLM performs abductive reasoning based only on these facts.
- * Example Output: Personalized Abductive Answer: "The user is having their usual decaf blend for better sleep.".
+To demonstrate the high technicality required for an ICML submission, we must move beyond "what" the blocks do and explain the mathematical and algorithmic mechanisms that make them novel. Standard RAG (Retrieval-Augmented Generation) is insufficient because it cannot handle the multi-dimensional complexity of 10 years of personal history or the semantic gap between pixels and abstract preferences.
+The following breakdown emphasizes why these mechanisms are non-obvious and technically rigorous.
+Block 1: Saliency-Triggered Temporal GGNN
+The Challenge: 10 years of a Personal Knowledge Graph (PKG) contains millions of nodes. Standard graph retrieval suffers from "relational noise," where similar but irrelevant nodes (e.g., every coffee the user ever drank) interfere with the specific context.
+ * Saliency-Triggered Pruning: We do not perform a keyword search. Instead, the Gating Signal is a high-dimensional vector derived from the visual saliency of the input image. This signal acts as a masking function over the graph’s adjacency matrix, performing hard-pruning of subgraphs that are semantically orthogonal to the observed visual entities before any message passing occurs.
+ * Temporal-Identity Gating: Within the Gated Graph Neural Network (GGNN), the Update Gate (\mathbf{z}_t) is modified to include a Temporal Decay Term (\tau) and an Identity Anchor (\alpha).
+   * Technicality: Instead of standard GRU-like updates, the hidden state of a node only propagates if it satisfies \sigma(W[\text{anchor}, \text{time\_delta}]) > \text{threshold}. This ensures that "Decaf history" at "Nighttime" is amplified while "Espresso history" from five years ago is suppressed at the latent level.
+   * Output: A Constraint Manifold (\mathcal{M})—a bounded subspace in the latent space that represents the "Logical Truths" for that specific user at that specific moment.
+Block 2: Manifold Alignment (Geometric Constraint)
+The Challenge: Pixels are deceptive; a user might look different due to aging or lighting (Identity Evolution).
+ * Projective Alignment: We don't just "feed" KG data to the model. We treat the Constraint Manifold (\mathcal{M}) as a geometric prior.
+ * Technical Mechanism: The raw visual tokens (V_{raw}) are projected into a shared embedding space. We calculate the Semantic Orthogonality Score between the visual features and the manifold.
+   * Technicality: If the visual features of "Red Wine" are detected, but the manifold \mathcal{M} (based on "disliked items") shows that the user hates red wine, the alignment layer applies a vector projection that shifts the visual embedding toward the "Gift" node in the manifold. This forces the model to "see" the wine as an anomaly/gift rather than a personal preference.
+Block 3: Abductive Cformer (MCCA)
+The Challenge: Standard Cross-Attention only cares about visual similarity. It doesn't know why a specific visual detail (like a "Decaf" label) is more important than a "Shiny Mug".
+ * Context-Seeded Query (Q_{seed}): Queries are not learned parameters; they are dynamically generated by fusing the User Query (Q) with the Personal Context Vector (C_{pers}) using a non-linear MLP.
+ * Manifold-Constrained Cross-Attention (MCCA): This is the core technical contribution.
+   * The Math: The attention score A is typically \text{Softmax}(QK^T/\sqrt{d}). We introduce a Constraint Penalty: A = \text{Softmax}(\frac{QK^T}{\sqrt{d}} - \lambda \cdot \text{dist}(K, \mathcal{M})).
+   * Technicality: \lambda is a learnable parameter that scales the distance between a visual token (K) and the nearest point on the truth manifold (\mathcal{M}).
+   * Result: Visual tokens that contradict the KG (e.g., "high-caffeine" cues at 11 PM) are mathematically suppressed, while tokens that explain the Abductive Anomaly (e.g., "Decaf Blend" text) are amplified.
+Example: "Sarah's Dinner" Red Wine
+ * Block 1: The system detects "Red Wine" and "19:00". The GGNN prunes the graph to ignore the user's wine preferences (dislike) but activates the "Calendar: Dinner at Sarah's" node.
+ * Block 2: The Manifold Alignment recognizes the anomaly—the user is holding an item they dislike. It projects the visual feature into the "Gift-giving" region of the manifold.
+ * Block 3: The MCCA ensures that when the user asks "How is this?", the attention heads ignore the "cherry notes" of the wine and focus on the "Gift" context retrieved from the KG.
+ * Block 4: The LLM generates the abductive answer: "Since you don't like red wine but are heading to Sarah's, this is a thoughtful gift".
+Would you like me to draft the "Methodology" section of the ICML paper using these formal mathematical definitions?
+
