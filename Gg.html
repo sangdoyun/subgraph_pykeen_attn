@@ -1,258 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Causal Probabilistic Graph: Intervention Model</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #ffffff;
-            --panel-bg: #f8f9fa;
-            --border-color: #e9ecef;
-            --text-primary: #1a1a1a;
-            --text-secondary: #6c757d;
-            
-            /* Node Colors */
-            --context-blue: #e3f2fd;
-            --context-border: #2196f3;
-            --action-green: #e8f5e9;
-            --action-border: #4caf50;
-            --state-red: #ffebee;
-            --state-border: #f44336;
-            --state-gold: #fff8e1;
-            --state-gold-border: #ffc107;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 40px;
-        }
-
-        header {
-            text-align: center;
-            max-width: 800px;
-        }
-
-        h1 {
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            margin-bottom: 10px;
-        }
-
-        p.subtitle {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-
-        .legend {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; }
-        .dot.blue { background: var(--context-blue); border-color: var(--context-border); }
-        .dot.green { background: var(--action-green); border-color: var(--action-border); }
-        .dot.red { background: var(--state-red); border-color: var(--state-border); }
-
-        .panels-container {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 40px;
-            width: 100%;
-            max-width: 1200px;
-        }
-
-        .panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-            position: relative;
-        }
-
-        .panel h2 {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 1rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-top: 0;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .panel-content {
-            display: flex;
-            justify-content: center;
-        }
-
-        /* Mermaid Customization */
-        .mermaid {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-        }
-        
-    </style>
-</head>
-<body>
-
-    <header>
-        <h1>Dynamic Causal Probabilistic Graph (DCPG)</h1>
-        <p class="subtitle">Visualizing the "Get a Pet" Intervention and Ripple Effects</p>
-        
-        <div class="legend">
-            <div class="legend-item"><div class="dot blue"></div> <strong>Context Node</strong> (Time, Env)</div>
-            <div class="legend-item"><div class="dot green"></div> <strong>Action Node</strong> (Behavior)</div>
-            <div class="legend-item"><div class="dot red"></div> <strong>State Node</strong> (Internal/Outcome)</div>
-        </div>
-    </header>
-
-    <div class="panels-container">
-
-        <!-- PANEL 1: BASELINE -->
-        <div class="panel">
-            <h2>01. Baseline (T<sub>0</sub>): The Loop of Stagnation</h2>
-            <div class="mermaid">
-                %%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter', 'fontSize': '14px', 'primaryColor': '#fff', 'edgeLabelBackground':'#fff'}}}%%
-                graph LR
-                    %% Nodes
-                    C_0700(Context: 07:00 AM):::ctx
-                    A_Sleep(Action: Sleep In):::act
-                    S_Rushed(State: Rushed):::state
-                    S_Stress(State: High Stress):::state
-                    
-                    C_1800(Context: 18:00 PM):::ctx
-                    A_TV(Action: Watch TV):::act
-                    S_Sedentary(State: Sedentary):::state
-                    A_Cook(Action: Cook):::act
-
-                    %% Edges
-                    C_0700 -->|Triggers| A_Sleep
-                    A_Sleep -->|Causes| S_Rushed
-                    S_Rushed -->|Increases| S_Stress
-                    
-                    S_Stress -->|Triggers| A_TV
-                    C_1800 --> A_TV
-                    A_TV -->|Reinforces| S_Sedentary
-                    S_Sedentary -.-x|Inhibits| A_Cook
-
-                    %% Styling Classes
-                    classDef ctx fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,rx:5,ry:5;
-                    classDef act fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,rx:0,ry:0;
-                    classDef state fill:#ffebee,stroke:#f44336,stroke-width:2px,rx:15,ry:15;
-                    
-                    %% Link Styling
-                    linkStyle 6 stroke:red,stroke-width:2px,stroke-dasharray: 5 5;
-            </div>
-        </div>
-
-        <!-- PANEL 2: INTERVENTION -->
-        <div class="panel">
-            <h2>02. Intervention (T<sub>I</sub>): The Do-Operator</h2>
-            <div class="mermaid">
-                %%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter', 'fontSize': '14px'}}}%%
-                graph LR
-                    %% Nodes
-                    C_0700(Context: 07:00 AM):::ctx
-                    A_Sleep(Action: Sleep In):::act_dim
-                    A_Walk(Action: Walk Dog):::act_new
-                    S_Budget(State: Budget):::state
-
-                    %% Edges
-                    C_0700 -.-x|SEVERED| A_Sleep
-                    C_0700 ==>|FORCED DO-OP| A_Walk
-                    A_Walk -->|Subtracts| S_Budget
-
-                    %% Styling Classes
-                    classDef ctx fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,rx:5,ry:5;
-                    classDef act_dim fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1px,color:#bdbdbd,rx:0,ry:0;
-                    classDef act_new fill:#4caf50,stroke:#2e7d32,stroke-width:3px,color:#fff,rx:0,ry:0;
-                    classDef state fill:#ffebee,stroke:#f44336,stroke-width:2px,rx:15,ry:15;
-
-                    %% Link Styling (Severed Edge)
-                    linkStyle 0 stroke:red,stroke-width:2px,stroke-dasharray: 3 3;
-                    %% Link Styling (Forced Edge)
-                    linkStyle 1 stroke:#2e7d32,stroke-width:4px;
-            </div>
-        </div>
-
-        <!-- PANEL 3: EVOLUTION -->
-        <div class="panel">
-            <h2>03. Evolution (T<sub>+30</sub>): The Ripple Effect</h2>
-            <div class="mermaid">
-                %%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter', 'fontSize': '14px'}}}%%
-                graph LR
-                    %% Nodes
-                    A_Walk(Action: Walk Dog):::act
-                    S_Light(State: AM Light):::state_new
-                    S_Sleep(State: Sleep Cycle):::state_new
-                    S_Energy(State: High Energy):::state_new
-                    
-                    C_1800(Context: 18:00 PM):::ctx
-                    A_Cook(Action: Cook):::act_new
-                    A_TV(Action: Watch TV):::act_dim
-                    
-                    C_Park(Context: Park):::ctx
-                    C_Social(Context: Social Opp):::ctx_new
-                    A_Talk(Action: Chat Neighbor):::act_new
-
-                    %% Edges - Ripple 1 (Bio)
-                    A_Walk --> S_Light
-                    S_Light -->|Regulates| S_Sleep
-                    S_Sleep --> S_Energy
-                    
-                    %% Edges - Ripple 2 (Behavior)
-                    S_Energy & C_1800 ==>|ACTIVATES| A_Cook
-                    C_1800 -.->|Weakened| A_TV
-                    
-                    %% Edges - Ripple 3 (Social)
-                    A_Walk & C_Park --> C_Social
-                    C_Social --> A_Talk
-
-                    %% Styling Classes
-                    classDef ctx fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,rx:5,ry:5;
-                    classDef ctx_new fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,rx:5,ry:5;
-                    classDef act fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,rx:0,ry:0;
-                    classDef act_new fill:#4caf50,stroke:#2e7d32,stroke-width:3px,color:#fff,rx:0,ry:0;
-                    classDef act_dim fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1px,color:#bdbdbd,rx:0,ry:0,stroke-dasharray: 5 5;
-                    classDef state fill:#ffebee,stroke:#f44336,stroke-width:2px,rx:15,ry:15;
-                    classDef state_new fill:#ffcdd2,stroke:#d32f2f,stroke-width:3px,rx:15,ry:15;
-
-                    %% Link Styling
-                    linkStyle 3 stroke:#2e7d32,stroke-width:3px;
-                    linkStyle 4 stroke:#bdbdbd,stroke-width:1px,stroke-dasharray: 3 3;
-            </div>
-        </div>
-
-    </div>
-
-    <script>
-        mermaid.initialize({ startOnLoad: true });
-    </script>
-</body>
-</html>
-
+I cannot directly create a file inside your Google Drive, but I can provide the exact structure below. You can copy and paste these tables directly into a new Google Sheet.
+I recommend setting up three specific tabs to keep your team aligned without overcomplicating things.
+Tab 1: Master OKR Dashboard (Y2026)
+Use this tab to set the direction. This doesn't change often—review it monthly or quarterly.
+| Category | Objective | Key Result (Measurable) | Baseline | Target (Y2026) | Owner | Status |
+|---|---|---|---|---|---|---|
+| Product | 1. Problem-Solution Fit | Active Faculties using product on real exams | 0 | 30 | [Name] | 🟡 |
+|  |  | Repeat Usage Rate (Retention) | 0% | 70-80% | [Name] | ⚪ |
+|  |  | Grading Time Saved per script (vs Manual) | 0x | 60-70% | [Name] | ⚪ |
+| Revenue | 2. Paying Customers | Fully Paid Customers | 0 | 1 | [Name] | ⚪ |
+|  |  | Pilot-to-Contract Conversion Rate | 0% | 20% | [Name] | ⚪ |
+| Trust/AI | 3. Trust & Reliability | "Incorrect Answer -> Correct Marking" Error Rate | TBD | < 1% | [Name] | 🟢 |
+|  |  | Student Flag Rate (Requests for regrade) | TBD | < 5% | [Name] | ⚪ |
+|  |  | Explainability Audit Logs coverage | 0% | 100% | [Name] | ⚪ |
+| GTM | 4. Repeatable Motion | Validated Acquisition Channels | 0 | 2 | [Name] | ⚪ |
+|  |  | Case Studies Published | 0 | 3 | [Name] | ⚪ |
+| Ops | 5. Compliance/Scale | Hiring Plan Execution (Lead Eng + Sales) | 0 | 2 Hired | [Name] | ⚪ |
+|  |  | Data Privacy/GDPR Compliance Check | No | Yes | [Name] | 🔴 |
+Tab 2: Weekly Tracker (The "Pulse")
+This is the most important tab. Every Monday, your leads should spend 5 minutes filling this out. It prevents the "I thought you were doing that" problem.
+| Week Starting | Priority for this Week (The "One Thing") | Big Wins (Last Week) | Blockers / Risks (Needs Help) | Confidence (1-10) |
+|---|---|---|---|---|
+| Jan 20 | Finalize "Per-student" pricing model draft | Validated handwriting OCR for Question 3 | Need decision on Cloud budget | 8 |
+| Jan 27 |  |  |  |  |
+| Feb 03 |  |  |  |  |
+Tab 3: KPI Data Log (The Raw Numbers)
+OKRs fail when people guess the numbers. Use this tab to log the actual data so "Tab 1" is accurate.
+| Metric Name | Jan Actual | Feb Actual | Mar Actual | Q1 Total | Notes |
+|---|---|---|---|---|---|
+| # Active Faculties | 2 | 5 |  |  | Includes Prof. Sharma & Prof. Gupta |
+| # Paid Pilots | 0 | 1 |  |  | MSIT signed trial |
+| Avg. Grading Time (Mins) | 15 | 12 |  |  | Target is 5 mins |
+| Student Flags (%) | 12% | 8% |  |  | Improvement due to new UI |
+How to use this system with your leads:
+ * The "Monday Ritual": Ask every lead to fill out Tab 2 (Weekly Tracker) before your Monday meeting.
+ * The Meeting: Don't read the sheet out loud. Look at the Blockers column in Tab 2. Spend the meeting solving those blockers.
+ * The Monthly Review: Open Tab 1 (Master Dashboard). Ask: "Are we on track to hit the '30 Faculties' goal? If not, do we need to change our strategy?"
